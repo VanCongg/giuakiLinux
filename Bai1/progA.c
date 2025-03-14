@@ -2,81 +2,77 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
-void read_and_write(const char *input_file, int pipe_fd)
+#define SEM_KEY 1234 // Khóa semaphore
+
+void process_file(const char *input_file, int fd_out)
 {
-    int fd = open(input_file, O_RDONLY);
-    if (fd == -1)
+    int fd_in = open(input_file, O_RDONLY);
+    if (fd_in < 0)
     {
-        perror("Open input file failed");
-        exit(EXIT_FAILURE);
+        perror("Lỗi mở file input");
+        exit(1);
     }
 
     char buffer[1024];
-    ssize_t bytes_read;
-    while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0)
+    ssize_t bytes;
+    while ((bytes = read(fd_in, buffer, sizeof(buffer))) > 0)
     {
-        write(pipe_fd, buffer, bytes_read);
+        write(fd_out, buffer, bytes);
     }
 
-    close(fd);
-    close(pipe_fd);
+    close(fd_in);
 }
 
 int main(int argc, char *argv[])
 {
     if (argc != 5)
     {
-        fprintf(stderr, "Usage: %s F1 F2 F3 time\n", argv[0]);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "Cách dùng: %s F1 F2 F3 time\n", argv[0]);
+        return 1;
     }
 
-    char *F1 = argv[1];
-    char *F2 = argv[2];
-    char *F3 = argv[3];
-    int time_sleep = atoi(argv[4]);
+    char *file1 = argv[1];
+    char *file2 = argv[2];
+    char *file3 = argv[3];
+    int sleep_time = atoi(argv[4]);
 
-    int pipe_fd[2];
-    pipe(pipe_fd);
-
-    pid_t p1 = fork();
-    if (p1 == 0)
+    int fd_out = open(file3, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd_out < 0)
     {
-        close(pipe_fd[0]);
-        read_and_write(F1, pipe_fd[1]);
-        exit(EXIT_SUCCESS);
+        perror("Lỗi mở file F3");
+        return 1;
     }
 
-    pid_t p2 = fork();
-    if (p2 == 0)
+    pid_t pid1 = fork();
+    if (pid1 == 0)
     {
-        close(pipe_fd[0]);
-        read_and_write(F2, pipe_fd[1]);
-        exit(EXIT_SUCCESS);
+        process_file(file1, fd_out);
+        exit(0);
     }
 
-    close(pipe_fd[1]);
+    pid_t pid2 = fork();
+    if (pid2 == 0)
+    {
+        process_file(file2, fd_out);
+        exit(0);
+    }
+
+    close(fd_out);
+
     wait(NULL);
     wait(NULL);
 
-    int output_fd = open(F3, O_WRONLY | O_CREAT | O_APPEND, 0644);
-    if (output_fd == -1)
-    {
-        perror("Open output file failed");
-        exit(EXIT_FAILURE);
-    }
+    sleep(sleep_time);
 
-    char buffer[1024];
-    ssize_t bytes_read;
-    while ((bytes_read = read(pipe_fd[0], buffer, sizeof(buffer))) > 0)
-    {
-        write(output_fd, buffer, bytes_read);
-    }
+    // Mở semaphore để thông báo progB có thể chạy
+    int sem_id = semget(SEM_KEY, 1, IPC_CREAT | 0666);
+    struct sembuf sem_op = {0, 1, 0};
+    semop(sem_id, &sem_op, 1);
 
-    close(output_fd);
-    close(pipe_fd[0]);
-
-    sleep(time_sleep);
     return 0;
 }
