@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     close(fd_out);
     wait(NULL);
     wait(NULL);
-
+    printf("Chương trình B đã hoàn thành. Kết quả đã ghi vào result.txt\n");
     sleep(sleep_time);
 
     return 0;
