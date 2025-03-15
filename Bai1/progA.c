@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     char *file1 = argv[1];
     char *file2 = argv[2];
     char *file3 = argv[3];
-    int sleep_time = atoi(argv[4]) // Thời gian chờ (chuyển từ string sang số nguyên)
+    int sleep_time = atoi(argv[4]); // Thời gian chờ (chuyển từ string sang số nguyên)
 
         // O_WRONLY - Mở file ở chế độ ghi.
         // O_CREAT - Nếu file chưa tồn tại,tạo mới file.
@@ -60,25 +60,34 @@ int main(int argc, char *argv[])
         process_file(file1, fd_out);
         exit(0);
     }
-
+    waitpid(pid1, NULL, 0);
     pid_t pid2 = fork();
     if (pid2 == 0)
     {
         process_file(file2, fd_out);
         exit(0);
     }
-
     close(fd_out);
 
-    wait(NULL);
-    wait(NULL);
-    printf("Chương trình A đã hoàn thành. Dữ liệu đã ghi vào output.txt\n");
+    waitpid(pid2, NULL, 0);
+
+    printf("Chương trình A đã hoàn thành. Dữ liệu đã ghi vào F3.\n");
     sleep(sleep_time);
 
-    // Mở semaphore để thông báo progB có thể chạy
-    int sem_id = semget(SEM_KEY, 1, IPC_CREAT | 0666); // lấy semaphore dựa vào key, nếu chưa có thì tạo mới, cho phép đọc và ghi
-    struct sembuf sem_op = {0, 1, 0}; // Tăng giá trị semaphore lên 1
-    semop(sem_id, &sem_op, 1); //báo hiệu A hoàn thành, bắt đầu chạy B
+    // Tạo và khởi tạo semaphore
+    int sem_id = semget(SEM_KEY, 1, IPC_CREAT | 0666);
+    if (sem_id == -1)
+    {
+        perror("Lỗi tạo semaphore");
+        exit(1);
+    }
+
+    // Đặt giá trị ban đầu của semaphore thành 0
+    semctl(sem_id, 0, SETVAL, 0);
+
+    // Tăng giá trị semaphore lên 1 để báo hiệu progB có thể chạy
+    struct sembuf sem_op = {0, 1, 0};
+    semop(sem_id, &sem_op, 1);
 
     return 0;
 }

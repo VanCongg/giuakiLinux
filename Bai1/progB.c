@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
         reverse_words(file3, fd_out);
         exit(0);
     }
-
+    waitpid(pid3, NULL, 0);
     pid_t pid4 = fork();
     if (pid4 == 0)
     {
@@ -113,8 +113,7 @@ int main(int argc, char *argv[])
     }
 
     close(fd_out);
-    wait(NULL);
-    wait(NULL);
+    waitpid(pid3, NULL, 0);
     printf("Chương trình B đã hoàn thành. Kết quả đã ghi vào result.txt\n");
     sleep(sleep_time);
 
