@@ -17,6 +17,7 @@
 typedef struct
 {
     int p, c, d; // Số lượng món khai vị (P), món chính (C), bánh ngọt (D)
+    int holding_p, holding_c, holding_d; // Số lượng món phục vụ đang cầm
     int served;  // Số thực khách đã phục vụ
 } SharedData;
 
@@ -60,68 +61,70 @@ void chef(int shmid, int semid)
 void waiter(int shmid, int semid)
 {
     SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
-    int holding_p = 0, holding_c = 0, holding_d = 0;
-
     while (data->served < K)
     {
         sem_op(semid, 0, -1); // Wait
 
         // Nếu còn chỗ chứa món ăn
-        if (holding_p + holding_c + holding_d < M)
+        if (data->holding_p + data->holding_c + data->holding_d < M && (data->p > 0 || data->c > 0 || data->d > 0))
         {
             int choice = rand() % 3; // Chọn ngẫu nhiên một món để lấy
             if (choice == 0 && data->p > 0)
             {
                 data->p--;
-                holding_p++;
+                data->holding_p++;
             }
             else if (choice == 1 && data->c > 0)
             {
                 data->c--;
-                holding_c++;
+                data->holding_c++;
             }
             else if (choice == 2 && data->d > 0)
             {
                 data->d--;
-                holding_d++;
+                data->holding_d++;
             }
         }
+        else{
+            break;
+        }
 
-        printf("Phục vụ cầm: P=%d, C=%d, D=%d\n", holding_p, holding_c, holding_d);
+        printf("Phục vụ cầm: P=%d, C=%d, D=%d\n", data->holding_p, data->holding_c, data->holding_d);
         sem_op(semid, 0, 1); // Signal
         sleep(1);
     }
     shmdt(data);
 }
 
-// Hàm của khách hàng
 void customer(int shmid, int semid, int id)
 {
-    SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
+    SharedData *data = (SharedData *)shmat(shmid, NULL, 0); // Gắn shared memory
+
     while (1)
     {
-        sem_op(semid, 0, -1); // Wait
+        sem_op(semid, 0, -1); // Wait (chặn nếu semaphore bị khóa)
 
-        if (data->served >= K)
+        if (data->served >= K) // Nếu đã phục vụ đủ số khách, thoát vòng lặp
         {
             sem_op(semid, 0, 1); // Signal
             break;
         }
 
-        // Nếu có đủ cả 3 món, khách nhận suất ăn
-        if (data->p > 0 && data->c > 0 && data->d > 0)
+        // Kiểm tra phục vụ có mang đủ 3 món không
+        if (data->holding_p > 0 && data->holding_c > 0 && data->holding_d > 0)
         {
-            data->p--;
-            data->c--;
-            data->d--;
-            data->served++;
-            printf("Khách %d đã nhận đủ thức ăn và rời đi.\n", id);
+            data->holding_p--;
+            data->holding_c--;
+            data->holding_d--;
+            data->served++; // Tăng số lượng khách đã phục vụ
+            printf("%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.\n",data->served);
         }
 
-        sem_op(semid, 0, 1); // Signal
-        sleep(1);
+        sem_op(semid, 0, 1); // Signal (mở khóa semaphore)
+        sleep(1);            // Nghỉ 1 giây để mô phỏng thời gian ăn uống
     }
-    shmdt(data);
+
+    shmdt(data); // Ngắt kết nối shared memory
 }
 
 int main()
@@ -133,13 +136,16 @@ int main()
     // Khởi tạo bộ nhớ dùng chung
     SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
     srand(time(NULL));
-    data->p = 0;
-    data->c = 0;
-    data->d = 0;
+    data->p = rand() % (K + 1); // Khởi tạo ngẫu nhiên số món khai vị
+    data->c = rand() % (K + 1); // Khởi tạo ngẫu nhiên số món chính
+    data->d = rand() % (K + 1); // Khởi tạo ngẫu nhiên số bánh ngọt
     data->served = 0;
+    data->holding_p = 0;
+    data->holding_c = 0;
+    data->holding_d = 0;
     shmdt(data);
 
-    // Tạo các tiến trình đầu bếp, phục vụ và thực khách
+    // Tạo các tiến trình đầu bếp, phục vụ và thực khách 
     if (fork() == 0)
     {
         chef(shmid, semid);
@@ -162,7 +168,16 @@ int main()
     // Chờ tất cả tiến trình con kết thúc
     for (int i = 0; i < K + 2; i++)
         wait(NULL);
-
+    // Reset dữ liệu trước khi xóa shared memory
+    data = (SharedData *)shmat(shmid, NULL, 0);
+    data->p = 0;
+    data->c = 0;
+    data->d = 0;
+    data->holding_p = 0;
+    data->holding_c = 0;
+    data->holding_d = 0;
+    data->served = 0;
+    shmdt(data);
     // Giải phóng tài nguyên
     shmctl(shmid, IPC_RMID, NULL);
     semctl(semid, 0, IPC_RMID);
