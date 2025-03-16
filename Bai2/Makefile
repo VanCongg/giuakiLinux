@@ -2,8 +2,6 @@ CC = gcc
 CFLAGS = -Wall -pthread
 TARGET = canteen
 
-all: $(TARGET)
-
 $(TARGET): canteen.o
 	$(CC) $(CFLAGS) -o $(TARGET) canteen.o
 
@@ -14,4 +12,4 @@ clean:
 	rm -f $(TARGET) *.o
 
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGET) 5
