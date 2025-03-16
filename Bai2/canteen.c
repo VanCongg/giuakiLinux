@@ -106,7 +106,7 @@ void waiter(int shmid, int semid)
 
 void customer(int shmid, int semid)
 {
-    SharedData *data = (SharedData *)shmat(shmid, NULL, 0); // Gắn shared memory
+    SharedData *data = (SharedData *)shmat(shmid, NULL, 0); 
     srand(time(NULL) ^ getpid());
 
     while (1)
@@ -114,17 +114,14 @@ void customer(int shmid, int semid)
         sem_op(semid, 2, -1);
         if (data->served >= data->k)
             break;
-
-        // Kiểm tra phục vụ có mang đủ 3 món không
         if (data->holding_p > 0 && data->holding_c > 0 && data->holding_d > 0)
         {
             data->holding_p--;
             data->holding_c--;
             data->holding_d--;
             data->served++;
-            // Tăng số lượng khách đã phục vụ
         }
-        printf("%d/%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.\n---------------\n", data->served, data->k);
+        printf("%d/%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.\n", data->served, data->k);
         sem_op(semid, 0, 1);
         sleep(1);           
     }
@@ -134,8 +131,6 @@ void customer(int shmid, int semid)
 
 int main(int argc, char *argv[])
 {
-    time_t start, end;
-    start = time(NULL);
     if (argc != 2)
     {
         fprintf(stderr, "Cách dùng: %s K\n", argv[0]);
