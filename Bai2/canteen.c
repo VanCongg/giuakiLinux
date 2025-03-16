@@ -20,12 +20,14 @@ typedef struct
     int served;                          // Số thực khách đã phục vụ
 } SharedData;
 
+// Hàm thao tác semaphore
 void sem_op(int sem_id, int sem_num, int op)
 {
     struct sembuf sb = {sem_num, op, 0};
     semop(sem_id, &sb, 1);
 }
 
+// Hàm của đầu bếp
 void chef(int shmid, int semid)
 {
     SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
@@ -56,13 +58,14 @@ void chef(int shmid, int semid)
             }
         }
         printf("Đầu bếp nấu: P=%d, C=%d, D=%d\n", data->p, data->c, data->d);
-        sem_op(semid, 1, 1);
+        sem_op(semid, 1, 1); // Signal
         sleep(1);
     }
-    sem_op(semid, 1, 1);
+    sem_op(semid, 1, 1); // Signal
     shmdt(data);
 }
 
+// Hàm của phục vụ
 void waiter(int shmid, int semid)
 {
     SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
@@ -70,13 +73,13 @@ void waiter(int shmid, int semid)
 
     while (data->served < data->k)
     {
-        sem_op(semid, 1, -1);
+        sem_op(semid, 1, -1); // Wait
         if (data->holding_p + data->holding_c + data->holding_d >= data->k * 2 + 1)
             break;
 
         while (data->p - data->served - data->holding_p > 0 || data->c - data->served - data->holding_c > 0 || data->d - data->served - data->holding_d > 0)
         {
-            int choice = rand() % 3;
+            int choice = rand() % 3; // Chọn ngẫu nhiên một món để lấy
             if (choice == 0 && data->p - data->served - data->holding_p > 0)
             {
                 data->holding_p++;
@@ -94,16 +97,16 @@ void waiter(int shmid, int semid)
             }
         }
         printf("Phục vụ cầm: P=%d, C=%d, D=%d\n", data->holding_p, data->holding_c, data->holding_d);
-        sem_op(semid, 2, 1);
+        sem_op(semid, 2, 1); // Signal
         sleep(1);
     }
-    sem_op(semid, 2, 1);
+    sem_op(semid, 2, 1); // Signal
     shmdt(data);
 }
 
 void customer(int shmid, int semid)
 {
-    SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
+    SharedData *data = (SharedData *)shmat(shmid, NULL, 0); // Gắn shared memory
     srand(time(NULL) ^ getpid());
 
     while (1)
@@ -112,23 +115,27 @@ void customer(int shmid, int semid)
         if (data->served >= data->k)
             break;
 
+        // Kiểm tra phục vụ có mang đủ 3 món không
         if (data->holding_p > 0 && data->holding_c > 0 && data->holding_d > 0)
         {
             data->holding_p--;
             data->holding_c--;
             data->holding_d--;
             data->served++;
+            // Tăng số lượng khách đã phục vụ
         }
-        printf("%d/%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.", data->served, data->k);
+        printf("%d/%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.\n---------------\n", data->served, data->k);
         sem_op(semid, 0, 1);
-        sleep(1);
+        sleep(1);           
     }
     sem_op(semid, 0, 1);
-    shmdt(data);
+    shmdt(data); // Ngắt kết nối shared memory
 }
 
 int main(int argc, char *argv[])
 {
+    time_t start, end;
+    start = time(NULL);
     if (argc != 2)
     {
         fprintf(stderr, "Cách dùng: %s K\n", argv[0]);
@@ -138,15 +145,15 @@ int main(int argc, char *argv[])
     int K = atoi(argv[1]);
     int shmid = shmget(SHM_KEY, sizeof(SharedData), IPC_CREAT | 0666);
     int semid = semget(SEM_KEY, 3, IPC_CREAT | 0666);
-    semctl(semid, 0, SETVAL, 1);
-    semctl(semid, 1, SETVAL, 0);
+    semctl(semid, 0, SETVAL, 1); // Semaphore cho chef (cho phép chạy ngay)
+    semctl(semid, 1, SETVAL, 0); // Semaphore cho waiter (chờ chef xong)
     semctl(semid, 2, SETVAL, 0);
     // Khởi tạo bộ nhớ dùng chung
     SharedData *data = (SharedData *)shmat(shmid, NULL, 0);
     srand(time(NULL));
-    data->p = rand() % (K + 1);
-    data->c = rand() % (K + 1);
-    data->d = rand() % (K + 1);
+    data->p = rand() % (K + 1); // Khởi tạo ngẫu nhiên số món khai vị
+    data->c = rand() % (K + 1); // Khởi tạo ngẫu nhiên số món chính
+    data->d = rand() % (K + 1); // Khởi tạo ngẫu nhiên số bánh ngọt
     data->k = K;
     data->served = 0;
     data->holding_p = 0;
@@ -179,6 +186,7 @@ int main(int argc, char *argv[])
     // Giải phóng tài nguyên
     shmctl(shmid, IPC_RMID, NULL);
     semctl(semid, 0, IPC_RMID, 0);
+
     printf("✅ Tất cả thực khách đã được phục vụ.\n");
     return 0;
 }
