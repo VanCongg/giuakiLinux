@@ -1,15 +1,14 @@
-#include <stdio.h>     // Thư viện chuẩn cho nhập/xuất
-#include <stdlib.h>    // Thư viện cho các hàm như exit(), atoi()
-#include <unistd.h>    // Chứa các system call như fork(), sleep(), write()
-#include <fcntl.h>     // Thư viện để thao tác file (open(), close())
-#include <sys/types.h> // Chứa kiểu dữ liệu hệ thống như pid_t
-#include <sys/wait.h>  // Chứa các hàm chờ tiến trình con kết thúc (wait())
-#include <sys/ipc.h>   // Thư viện hỗ trợ giao tiếp liên tiến trình (IPC)
-#include <sys/sem.h>   // Hỗ trợ semaphore để đồng bộ tiến trình
+#include <stdio.h>     
+#include <stdlib.h>    
+#include <unistd.h> 
+#include <fcntl.h>    
+#include <sys/types.h> 
+#include <sys/wait.h>  
+#include <sys/ipc.h>   
+#include <sys/sem.h>  
 
-#define SEM_KEY 1234 // Khóa semaphore
+#define SEM_KEY 1234 
 
-// Hàm đọc dữ liệu từ file input_file và ghi vào file fd_out
 void process_file(const char *input_file, int fd_out)
 {
     // Mở file input_file chỉ đọc
@@ -42,11 +41,8 @@ int main(int argc, char *argv[])
     char *file1 = argv[1];
     char *file2 = argv[2];
     char *file3 = argv[3];
-    int sleep_time = atoi(argv[4]); // Thời gian chờ (chuyển từ string sang số nguyên)
+    int sleep_time = atoi(argv[4]);
 
-        // O_WRONLY - Mở file ở chế độ ghi.
-        // O_CREAT - Nếu file chưa tồn tại,tạo mới file.
-        // O_TRUNC - Nếu file đã tồn tại, xóa hết dữ liệu cũ.
     int fd_out = open(file3, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd_out < 0)
     {
@@ -81,11 +77,8 @@ int main(int argc, char *argv[])
         perror("Lỗi tạo semaphore");
         exit(1);
     }
-
-    // Đặt giá trị ban đầu của semaphore thành 0
     semctl(sem_id, 0, SETVAL, 0);
 
-    // Tăng giá trị semaphore lên 1 để báo hiệu progB có thể chạy
     struct sembuf sem_op = {0, 1, 0};
     semop(sem_id, &sem_op, 1);
 

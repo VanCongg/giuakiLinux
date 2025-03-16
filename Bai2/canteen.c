@@ -119,7 +119,7 @@ void customer(int shmid, int semid)
             data->holding_d--;
             data->served++;
         }
-        printf("%d/%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.\n---------------\n", data->served, data->k);
+        printf("%d/%d Khách đã nhận đủ thức ăn từ phục vụ và rời đi.", data->served, data->k);
         sem_op(semid, 0, 1);
         sleep(1);
     }
@@ -129,8 +129,6 @@ void customer(int shmid, int semid)
 
 int main(int argc, char *argv[])
 {
-    time_t start, end;
-    start = time(NULL);
     if (argc != 2)
     {
         fprintf(stderr, "Cách dùng: %s K\n", argv[0]);
@@ -181,10 +179,6 @@ int main(int argc, char *argv[])
     // Giải phóng tài nguyên
     shmctl(shmid, IPC_RMID, NULL);
     semctl(semid, 0, IPC_RMID, 0);
-
-    end = time(NULL);
-    double cooking_time = difftime(end, start);
-
-    printf("✅ Tất cả thực khách đã được phục vụ. Thời gian phục vụ: %.2f giây.\n", cooking_time);
+    printf("✅ Tất cả thực khách đã được phục vụ.\n");
     return 0;
 }
